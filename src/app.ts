@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
 import Fastify from 'fastify';
 import mercurius from 'mercurius';
+import { GraphQLContext } from './graphql/context';
 import { formatGraphQLError } from './graphql/errors/error.formatter';
-import { resolvers, typeDefs } from './graphql/schema';
+import { createLoaders } from './graphql/loaders';
+import { repositories, resolvers, typeDefs } from './graphql/schema';
 
 dotenv.config();
 
@@ -29,6 +31,11 @@ async function startServer(): Promise<void> {
           errors: formattedErrors,
           data: execution.data,
         },
+      };
+    },
+    context: (): GraphQLContext => {
+      return {
+        loaders: createLoaders(repositories.userRepository, repositories.orbRepository),
       };
     },
   });
