@@ -1,7 +1,7 @@
 // EXEMPLO: Como a entidade Verification deve ser estruturada
-// 
+//
 // ✅ CORRETO: Apenas IDs, sem importar User ou Orb
-// 
+//
 // export class Verification {
 //   id: string;
 //   userId: string;        // Referência ao User (apenas ID)
@@ -28,4 +28,3 @@
 //   user: User;  // ❌ Acoplamento direto - quebra Clean Architecture
 //   orb: Orb;    // ❌ Acoplamento direto - quebra Clean Architecture
 // }
-

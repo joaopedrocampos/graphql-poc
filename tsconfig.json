@@ -2,18 +2,51 @@
     "compilerOptions": {
         "target": "ES2022",
         "module": "CommonJS",
+        "lib": ["ES2022"],
+
+        // Strict Type-Checking Options
         "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "resolveJsonModule": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictBindCallApply": true,
+        "strictPropertyInitialization": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+
+        // Additional Checks
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noPropertyAccessFromIndexSignature": false, // Desabilitado para facilitar validações de DTOs
+
+        // Module Resolution
         "moduleResolution": "node",
-        "forceConsistentCasingInFileNames": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "baseUrl": "./src",
+        "paths": {
+            "~/*": ["./*"]
+        },
+
+        // Emit
         "outDir": "./dist",
         "rootDir": "./src",
         "sourceMap": true,
         "declaration": true,
-        "declarationMap": true
+        "declarationMap": true,
+        "removeComments": false,
+        "noEmitOnError": true,
+
+        // Interop Constraints
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true
     },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/__tests__/**"]
+    "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/__tests__/**", "**/*.test.ts"]
 }

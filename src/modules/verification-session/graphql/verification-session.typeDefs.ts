@@ -29,4 +29,3 @@ export const verificationSessionTypeDefs = `
         updateVerificationSessionStatus(id: ID!, status: VerificationSessionStatus!): VerificationSession!
     }
 `;
-

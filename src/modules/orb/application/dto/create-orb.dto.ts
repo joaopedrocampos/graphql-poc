@@ -1,4 +1,4 @@
-import { Location, OrbStatus } from '../../domain/orb.types';
+import { Location, OrbStatus } from '~/modules/orb/domain/orb.types';
 
 export interface CreateOrbDto {
   serialNumber: string;
@@ -6,74 +6,59 @@ export interface CreateOrbDto {
   status: OrbStatus;
 }
 
-export function validateCreateOrbDto(data: any): CreateOrbDto {
-  // Validar serialNumber
-  if (!data.serialNumber || typeof data.serialNumber !== 'string') {
-    throw new Error('SerialNumber is required and must be a string');
+export function validateCreateOrbDto(data: unknown): CreateOrbDto {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Data must be an object');
   }
 
-  if (data.serialNumber.trim().length === 0) {
-    throw new Error('SerialNumber cannot be empty');
+  const obj = data as Partial<CreateOrbDto>;
+
+  // Validar serialNumber
+  if (typeof obj.serialNumber !== 'string' || obj.serialNumber.trim().length === 0) {
+    throw new Error('SerialNumber is required and must be a non-empty string');
   }
 
   // Validar location
-  if (!data.location || typeof data.location !== 'object') {
+  if (!obj.location || typeof obj.location !== 'object') {
     throw new Error('Location is required and must be an object');
   }
 
-  if (!data.location.country || typeof data.location.country !== 'string') {
-    throw new Error('Location country is required and must be a string');
+  const location = obj.location;
+
+  if (typeof location.country !== 'string' || location.country.trim().length === 0) {
+    throw new Error('Location country is required and must be a non-empty string');
   }
 
-  if (data.location.country.trim().length === 0) {
-    throw new Error('Location country cannot be empty');
+  if (typeof location.city !== 'string' || location.city.trim().length === 0) {
+    throw new Error('Location city is required and must be a non-empty string');
   }
 
-  if (!data.location.city || typeof data.location.city !== 'string') {
-    throw new Error('Location city is required and must be a string');
+  if (typeof location.latitude !== 'number' || location.latitude < -90 || location.latitude > 90) {
+    throw new Error('Location latitude is required and must be a number between -90 and 90');
   }
 
-  if (data.location.city.trim().length === 0) {
-    throw new Error('Location city cannot be empty');
-  }
-
-  if (typeof data.location.latitude !== 'number') {
-    throw new Error('Location latitude is required and must be a number');
-  }
-
-  if (typeof data.location.longitude !== 'number') {
-    throw new Error('Location longitude is required and must be a number');
-  }
-
-  // Validar latitude (-90 a 90)
-  if (data.location.latitude < -90 || data.location.latitude > 90) {
-    throw new Error('Latitude must be between -90 and 90');
-  }
-
-  // Validar longitude (-180 a 180)
-  if (data.location.longitude < -180 || data.location.longitude > 180) {
-    throw new Error('Longitude must be between -180 and 180');
+  if (
+    typeof location.longitude !== 'number' ||
+    location.longitude < -180 ||
+    location.longitude > 180
+  ) {
+    throw new Error('Location longitude is required and must be a number between -180 and 180');
   }
 
   // Validar status
-  if (!data.status || typeof data.status !== 'string') {
-    throw new Error('Status is required and must be a string');
-  }
-
   const validStatuses: OrbStatus[] = ['ACTIVE', 'INACTIVE', 'MAINTENANCE'];
-  if (!validStatuses.includes(data.status as OrbStatus)) {
-    throw new Error(`Status must be one of: ${validStatuses.join(', ')}`);
+  if (!obj.status || !validStatuses.includes(obj.status)) {
+    throw new Error('Status is required and must be one of: ACTIVE, INACTIVE, MAINTENANCE');
   }
 
   return {
-    serialNumber: data.serialNumber.trim(),
+    serialNumber: obj.serialNumber.trim(),
     location: {
-      country: data.location.country.trim(),
-      city: data.location.city.trim(),
-      latitude: data.location.latitude,
-      longitude: data.location.longitude,
+      country: location.country.trim(),
+      city: location.city.trim(),
+      latitude: location.latitude,
+      longitude: location.longitude,
     },
-    status: data.status as OrbStatus,
+    status: obj.status,
   };
 }
-

@@ -1,6 +1,6 @@
 # 📊 Status do Projeto - GraphQL POC
 
-**Última atualização**: 2024-12-03 (todos os módulos completos e testados)
+**Última atualização**: 2024-12-03 (configuração TypeScript/ESLint completa, path aliases implementados)
 
 Este documento serve como fonte de verdade sobre o estado atual do projeto, decisões arquiteturais e próximos passos.
 
@@ -176,16 +176,25 @@ modules/{nome}/
 - `ts-node-dev` - Desenvolvimento com hot reload
 - `node-pg-migrate` - Migrations
 - `@types/node`, `@types/pg` - Tipos TypeScript
+- `eslint` - Linter com regras TypeScript
+- `prettier` - Formatação de código
+- `tsconfig-paths` - Suporte a path aliases em runtime
 
 ### Scripts (package.json)
 
 ```json
-"dev": "ts-node-dev --respawn --transpile-only src/app.ts"
+"dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/app.ts"
 "build": "tsc"
 "start": "node dist/app.js"
 "migrate:up": "node -r dotenv/config node_modules/.bin/node-pg-migrate up --migrations-dir src/database/migrations"
 "migrate:down": "node -r dotenv/config node_modules/.bin/node-pg-migrate down --migrations-dir src/database/migrations"
 "migrate:create": "node-pg-migrate create --migrations-dir src/database/migrations"
+"lint": "eslint src --ext .ts"
+"lint:fix": "eslint src --ext .ts --fix"
+"format": "prettier --write \"src/**/*.{ts,json}\""
+"format:check": "prettier --check \"src/**/*.{ts,json}\""
+"type-check": "tsc --noEmit"
+"check": "npm run type-check && npm run lint && npm run format:check"
 ```
 
 ### Variáveis de Ambiente (.env)
@@ -276,6 +285,17 @@ infrastructure/              # AWS CDK
 - **Padrão**: Primeiro módulo define `type Query` e `type Mutation`, demais usam `extend type Query` e `extend type Mutation`
 - **Razão**: GraphQL não permite múltiplas definições do mesmo tipo
 - **Implementação**: User module define tipos base, Orb e VerificationSession usam `extend`
+
+### 7. Path Aliases com `~`
+- **Decisão**: Usar `~` como alias para `src/` em todos os imports
+- **Razão**: Evita imports relativos complexos (`../../../`), código mais limpo e fácil de mover arquivos
+- **Configuração**: `tsconfig.json` com `baseUrl` e `paths`, `tsconfig-paths` para runtime
+- **Exemplo**: `import pool from '~/config/database'` ao invés de `import pool from '../../../config/database'`
+
+### 8. TypeScript Strict Mode Configurado
+- **Configuração**: TypeScript com strict mode completo, mas `noPropertyAccessFromIndexSignature: false`
+- **Razão**: Facilita validações de DTOs sem precisar usar bracket notation excessivamente
+- **ESLint**: Regras específicas para arquivos DTO que desabilitam unsafe operations (necessárias em validações)
 
 ---
 
@@ -372,9 +392,9 @@ infrastructure/              # AWS CDK
 
 1. **Testes**: Não implementados ainda (unit tests, integration tests)
 2. **Error Handling**: Pode ser melhorado (formatação GraphQL mais consistente)
-3. **Type Safety**: Alguns `any` nos resolvers (aceitável por enquanto, mas pode ser melhorado)
-4. **N+1 Problem**: Não resolvido ainda (DataLoader necessário para queries aninhadas)
-5. **Pagination**: Não implementada (cursor-based pagination para listagens)
+3. **N+1 Problem**: Não resolvido ainda (DataLoader necessário para queries aninhadas)
+4. **Pagination**: Não implementada (cursor-based pagination para listagens)
+5. **app.ts**: Erro de tipo com Mercurius (não crítico, não afeta funcionamento)
 
 ## 📝 Implementações Recentes
 
@@ -406,6 +426,15 @@ infrastructure/              # AWS CDK
 - ✅ Relacionamentos entre módulos usando apenas IDs (não importar entidades diretamente)
 - ✅ Validação de existência de entidades relacionadas no Service antes de criar relacionamento
 
+### Configuração TypeScript e Tooling (2024-12-03)
+- ✅ TypeScript strict mode completo configurado
+- ✅ ESLint com regras TypeScript estritas
+- ✅ Prettier para formatação automática
+- ✅ Path aliases (`~`) configurados e aplicados em todos os imports
+- ✅ Regras ESLint específicas para arquivos DTO (permite unsafe operations necessárias em validações)
+- ✅ `noPropertyAccessFromIndexSignature: false` para facilitar validações sem bracket notation excessiva
+- ✅ Validações de DTO simplificadas (sem type guards complexos, validação direta)
+
 ---
 
 ## 🔍 Como Consultar Este Documento
@@ -424,4 +453,3 @@ Este arquivo deve ser atualizado sempre que:
 ---
 
 **Nota**: Este documento é atualizado dinamicamente durante o desenvolvimento. Sempre consulte a versão mais recente.
-

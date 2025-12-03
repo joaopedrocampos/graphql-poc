@@ -1,42 +1,45 @@
-import { User } from '../domain/user.entity';
-import { UserEmailAlreadyExistsError, UserNotFoundError } from '../domain/user.errors';
-import { IUserRepository } from '../domain/user.repository.interface';
-import { CreateUserDto, validateCreateUserDto } from './dto/create-user.dto';
+import { User } from '~/modules/user/domain/user.entity';
+import { UserEmailAlreadyExistsError, UserNotFoundError } from '~/modules/user/domain/user.errors';
+import { IUserRepository } from '~/modules/user/domain/user.repository.interface';
+import {
+  CreateUserDto,
+  validateCreateUserDto,
+} from '~/modules/user/application/dto/create-user.dto';
 
 export class UserService {
-    private readonly userRepository: IUserRepository;
+  private readonly userRepository: IUserRepository;
 
-    constructor(userRepository: IUserRepository) {
-        this.userRepository = userRepository;
+  constructor(userRepository: IUserRepository) {
+    this.userRepository = userRepository;
+  }
+
+  async findById(id: string): Promise<User> {
+    const user = await this.userRepository.findById(id);
+    if (!user) {
+      throw new UserNotFoundError(id);
     }
 
-    async findById(id: string): Promise<User> {
-        const user = await this.userRepository.findById(id);
-        if (!user) {
-            throw new UserNotFoundError(id);
-        }
+    return user;
+  }
 
-        return user;
+  async findByEmail(email: string): Promise<User> {
+    const user = await this.userRepository.findByEmail(email);
+
+    if (!user) {
+      throw new UserNotFoundError(email);
     }
 
-    async findByEmail(email: string): Promise<User> {
-        const user = await this.userRepository.findByEmail(email);
+    return user;
+  }
 
-        if (!user) {
-            throw new UserNotFoundError(email);
-        }
+  async create(data: CreateUserDto): Promise<User> {
+    const validatedData = validateCreateUserDto(data);
 
-        return user;
+    const existingUser = await this.userRepository.findByEmail(validatedData.email);
+    if (existingUser) {
+      throw new UserEmailAlreadyExistsError(validatedData.email);
     }
 
-    async create(data: CreateUserDto): Promise<User> {
-        const validatedData = validateCreateUserDto(data);
-
-        const existingUser = await this.userRepository.findByEmail(validatedData.email);
-        if (existingUser) {
-            throw new UserEmailAlreadyExistsError(validatedData.email);
-        }
-
-        return await this.userRepository.create(validatedData);
-    }
+    return await this.userRepository.create(validatedData);
+  }
 }

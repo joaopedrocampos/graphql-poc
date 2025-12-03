@@ -43,7 +43,7 @@
 //     orb: any;
 //   }> {
 //     const verification = await this.findById(id);
-//     
+//
 //     // Buscar dados dos outros módulos através das interfaces
 //     const user = await this.userRepository.findById(verification.userId);
 //     const orb = await this.orbRepository.findById(verification.orbId);
@@ -66,4 +66,3 @@
 //     private orbRepo: OrbRepository,   // ❌ Depender de implementação concreta
 //   ) {}
 // }
-
