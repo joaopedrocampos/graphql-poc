@@ -105,4 +105,42 @@ export class OrbRepositoryPostgres implements IOrbRepository {
       updatedAt: row.updated_at,
     });
   }
+
+  async findByIds(ids: string[]): Promise<(Orb | null)[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const result = await pool.query(`SELECT * FROM orbs WHERE id = ANY($1::uuid[])`, [ids]);
+
+    const orbsMap = new Map<string, Orb>();
+    result.rows.forEach((row) => {
+      const rowTyped = row as {
+        id: string;
+        serial_number: string;
+        location: string | Location;
+        status: OrbStatus;
+        created_at: Date;
+        updated_at: Date;
+      };
+
+      // Parse JSONB location se necessário
+      const location: Location =
+        typeof rowTyped.location === 'string'
+          ? (JSON.parse(rowTyped.location) as Location)
+          : rowTyped.location;
+
+      const orb = new Orb({
+        id: rowTyped.id,
+        serialNumber: rowTyped.serial_number,
+        location,
+        status: rowTyped.status,
+        createdAt: rowTyped.created_at,
+        updatedAt: rowTyped.updated_at,
+      });
+      orbsMap.set(rowTyped.id, orb);
+    });
+
+    return ids.map((id) => orbsMap.get(id) || null);
+  }
 }

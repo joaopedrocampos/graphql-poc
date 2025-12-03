@@ -16,6 +16,8 @@ export const verificationSessionTypeDefs = `
         status: VerificationSessionStatus!
         createdAt: String!
         updatedAt: String!
+        user: User!
+        orb: Orb!
     }
 
     extend type Query {
