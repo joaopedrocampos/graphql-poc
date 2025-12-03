@@ -1,6 +1,6 @@
 # 📊 Status do Projeto - GraphQL POC
 
-**Última atualização**: 2024-12-03 (atualizado após implementação Orb Module)
+**Última atualização**: 2024-12-03 (todos os módulos completos e testados)
 
 Este documento serve como fonte de verdade sobre o estado atual do projeto, decisões arquiteturais e próximos passos.
 
@@ -73,7 +73,7 @@ modules/{nome}/
 
 ---
 
-### ✅ Orb Module (QUASE COMPLETO)
+### ✅ Orb Module (COMPLETO)
 
 **Domain:**
 - `orb.entity.ts` - Entidade Orb (id, serialNumber, location, status, createdAt, updatedAt)
@@ -87,12 +87,12 @@ modules/{nome}/
 
 **Infrastructure:**
 - `orb.repository.postgres.ts` - Implementação PostgreSQL completa
-  - findById: Busca por ID
+  - findById: Busca por ID com conversão JSONB → objeto
   - create: Cria Orb com location como JSONB
   - updateStatus: Atualiza apenas status
 
 **GraphQL:**
-- `orb.typeDefs.ts` - Schema GraphQL completo
+- `orb.typeDefs.ts` - Schema GraphQL completo (usando `extend type Query/Mutation`)
   - Type `Location` (country, city, latitude, longitude)
   - Input `LocationInput` para mutations
   - Enum `OrbStatus` (ACTIVE, INACTIVE, MAINTENANCE)
@@ -106,24 +106,57 @@ modules/{nome}/
   - Conversão Date → String implementada
 
 **Database:**
-- ✅ Migration criada: `create_orbs_table`
+- ✅ Migration criada e executada: `create_orbs_table`
   - Tabela: `orbs` com id (UUID, PK), serial_number (VARCHAR, UNIQUE), location (JSONB), status (VARCHAR com CHECK constraint), created_at, updated_at
   - Constraint CHECK para status válido
-- ⚠️ Migration ainda não executada
 
-**Status**: ⚠️ Falta executar migration e integrar no schema principal (`src/graphql/schema.ts`)
+**Status**: ✅ Funcionando e testado
 
 ---
 
-### ⏳ VerificationSession Module (NÃO INICIADO)
+### ✅ VerificationSession Module (COMPLETO)
 
-**Planejado:**
-- Entidade com: id, userId, orbId, startedAt, completedAt, status
-- Relaciona User e Orb por IDs (não importa entidades diretamente)
-- Queries: verificationSession, verificationSessionsByUser
-- Mutations: createVerificationSession, completeVerificationSession
+**Domain:**
+- `verification-session.entity.ts` - Entidade VerificationSession (id, userId, orbId, startedAt, completedAt, status, createdAt, updatedAt)
+- `verification-session.types.ts` - VerificationSessionStatus enum (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
+- `verification-session.repository.interface.ts` - Interface IVerificationSessionRepository
+- `verification-session.errors.ts` - VerificationSessionNotFoundError, VerificationSessionAlreadyCompletedError
 
-**Status**: ⏳ Não iniciado
+**Application:**
+- `verification-session.service.ts` - VerificationSessionService
+  - Injeção de dependências: IUserRepository e IOrbRepository (valida existência antes de criar)
+  - Métodos: findById, findByUserId, create, complete, updateStatus
+- `dto/create-verification-session.dto.ts` - Validação de userId e orbId
+
+**Infrastructure:**
+- `verification-session.repository.postgres.ts` - Implementação PostgreSQL completa
+  - findById: Busca por ID
+  - findByUserId: Lista todas as sessões de um usuário (ordenado por created_at DESC)
+  - create: Cria nova sessão
+  - updateStatus: Atualiza status e completedAt
+
+**GraphQL:**
+- `verification-session.typeDefs.ts` - Schema GraphQL completo (usando `extend type Query/Mutation`)
+  - Enum `VerificationSessionStatus` (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
+  - Type `VerificationSession` completo
+  - Queries: `verificationSession(id: ID!)`, `verificationSessionsByUser(userId: ID!)`
+  - Mutations: `createVerificationSession`, `completeVerificationSession`, `updateVerificationSessionStatus`
+- `verification-session.resolvers.ts` - Resolvers completos
+  - Query: `verificationSession` (retorna null se não encontrar)
+  - Query: `verificationSessionsByUser` (retorna array)
+  - Mutation: `createVerificationSession` (valida User e Orb existem)
+  - Mutation: `completeVerificationSession` (completa sessão)
+  - Mutation: `updateVerificationSessionStatus` (atualiza status)
+  - Conversão Date → String implementada
+
+**Database:**
+- ✅ Migration criada e executada: `create_verification_sessions_table`
+  - Tabela: `verification_sessions` com id (UUID, PK), user_id (UUID, FK → users), orb_id (UUID, FK → orbs), started_at, completed_at (nullable), status (VARCHAR com CHECK constraint), created_at, updated_at
+  - Foreign keys com CASCADE delete
+  - Índices em user_id, orb_id e status
+  - Constraint CHECK para status válido
+
+**Status**: ✅ Funcionando e testado
 
 ---
 
@@ -193,8 +226,8 @@ src/
 │   └── context.ts           # Context GraphQL (vazio)
 ├── modules/
 │   ├── user/                # ✅ Completo
-│   ├── orb/                 # ⚠️ Quase completo
-│   └── verification-session/ # ⏳ Não iniciado
+│   ├── orb/                 # ✅ Completo
+│   └── verification-session/ # ✅ Completo
 └── shared/                  # Código compartilhado (vazio)
 
 infrastructure/              # AWS CDK
@@ -225,6 +258,8 @@ infrastructure/              # AWS CDK
 - **Padrão**: Usar referências por ID, não importar entidades diretamente
 - **Exemplo**: VerificationSession tem `userId` e `orbId` (strings), não objetos User/Orb
 - **Razão**: Mantém módulos desacoplados, segue DDD
+- **Implementação**: Service injeta interfaces dos outros módulos (IUserRepository, IOrbRepository) para validar existência antes de criar relacionamento
+- **Benefício**: Domain permanece isolado, fácil de testar com mocks
 
 ### 4. DTOs para Validação
 - **Padrão**: Criar DTOs com função de validação separada
@@ -235,6 +270,12 @@ infrastructure/              # AWS CDK
 - **Padrão**: Converter `Date` para `String` nos resolvers
 - **Razão**: GraphQL não tem tipo DateTime nativo, usa String
 - **Implementação**: `createdAt.toISOString()` nos resolvers
+- **Tratamento de null**: `completedAt?.toISOString() || null` para campos opcionais
+
+### 6. Extend Type no GraphQL Schema
+- **Padrão**: Primeiro módulo define `type Query` e `type Mutation`, demais usam `extend type Query` e `extend type Mutation`
+- **Razão**: GraphQL não permite múltiplas definições do mesmo tipo
+- **Implementação**: User module define tipos base, Orb e VerificationSession usam `extend`
 
 ---
 
@@ -270,13 +311,15 @@ infrastructure/              # AWS CDK
 - updated_at (TIMESTAMP)
 
 **orbs:**
-- ✅ Migration criada: `create_orbs_table`
+- ✅ Migration criada e executada: `create_orbs_table`
 - Estrutura: id (UUID, PK), serial_number (VARCHAR, UNIQUE), location (JSONB), status (VARCHAR com CHECK constraint), created_at, updated_at
-- ⚠️ Migration ainda não executada
+- Constraint CHECK para status válido
 
 **verification_sessions:**
-- ⏳ Não criada
-- Planejado: id (UUID, PK), user_id (UUID, FK), orb_id (UUID, FK), started_at, completed_at, status
+- ✅ Migration criada e executada: `create_verification_sessions_table`
+- Estrutura: id (UUID, PK), user_id (UUID, FK → users), orb_id (UUID, FK → orbs), started_at (TIMESTAMP), completed_at (TIMESTAMP, nullable), status (VARCHAR com CHECK constraint), created_at, updated_at
+- Foreign keys com CASCADE delete
+- Índices em user_id, orb_id e status
 
 ### Migrations
 
@@ -288,21 +331,12 @@ infrastructure/              # AWS CDK
 
 ## 🚀 Próximos Passos
 
-### Curto Prazo (Orb Module)
-1. ✅ Criar migration para tabela `orbs` - FEITO
-2. ⏳ Executar migration (`npm run migrate:up`)
-3. ⏳ Integrar Orb no schema GraphQL principal (`src/graphql/schema.ts`)
-4. ⏳ Testar queries e mutations do Orb
+### Curto Prazo (Melhorias e Refinamentos)
+1. ⏳ Melhorar tratamento de erros GraphQL (formatação consistente)
+2. ⏳ Adicionar validações adicionais nos DTOs
+3. ⏳ Revisar e melhorar type safety (remover `any` dos resolvers)
 
-### Médio Prazo (VerificationSession Module)
-1. ⏳ Implementar Domain Layer (Entity, Interface, Errors)
-2. ⏳ Implementar Application Layer (Service, DTOs)
-3. ⏳ Implementar Infrastructure Layer (Repository PostgreSQL)
-4. ⏳ Implementar GraphQL Layer (TypeDefs, Resolvers)
-5. ⏳ Criar migration para tabela `verification_sessions`
-6. ⏳ Integrar no schema principal
-
-### Longo Prazo (Features Avançadas)
+### Médio Prazo (Features Avançadas)
 1. ⏳ DataLoader (resolver N+1 problem)
 2. ⏳ Cursor-based pagination
 3. ⏳ Query depth/complexity limits
@@ -336,11 +370,11 @@ infrastructure/              # AWS CDK
 
 ## ⚠️ Problemas Conhecidos / Pendências
 
-1. **Orb Module**: Falta executar migration e integrar no schema principal
-2. **VerificationSession Module**: Não iniciado
-3. **Testes**: Não implementados ainda
-4. **Error Handling**: Pode ser melhorado (formatação GraphQL)
-5. **Type Safety**: Alguns `any` nos resolvers (aceitável por enquanto)
+1. **Testes**: Não implementados ainda (unit tests, integration tests)
+2. **Error Handling**: Pode ser melhorado (formatação GraphQL mais consistente)
+3. **Type Safety**: Alguns `any` nos resolvers (aceitável por enquanto, mas pode ser melhorado)
+4. **N+1 Problem**: Não resolvido ainda (DataLoader necessário para queries aninhadas)
+5. **Pagination**: Não implementada (cursor-based pagination para listagens)
 
 ## 📝 Implementações Recentes
 
@@ -352,6 +386,25 @@ infrastructure/              # AWS CDK
 - ✅ Criados TypeDefs GraphQL com tipos aninhados (Location, LocationInput)
 - ✅ Criados Resolvers completos (orb, createOrb, updateOrbStatus)
 - ✅ Criada migration com constraint CHECK para status
+- ✅ Migration executada e integrado no schema principal
+- ✅ Testado e funcionando
+
+### VerificationSession Module (2024-12-03)
+- ✅ Criada entidade VerificationSession com relacionamentos por ID (userId, orbId)
+- ✅ Criado enum VerificationSessionStatus (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
+- ✅ Criado Service com injeção de dependências (IUserRepository, IOrbRepository)
+- ✅ Validação de existência de User e Orb antes de criar sessão
+- ✅ Implementado Repository PostgreSQL com foreign keys e índices
+- ✅ Criados TypeDefs GraphQL usando `extend type Query/Mutation`
+- ✅ Criados Resolvers completos (verificationSession, verificationSessionsByUser, createVerificationSession, completeVerificationSession, updateVerificationSessionStatus)
+- ✅ Criada migration com foreign keys, índices e constraints
+- ✅ Migration executada e integrado no schema principal
+- ✅ Testado e funcionando
+
+### Decisões Importantes (2024-12-03)
+- ✅ Uso de `extend type Query` e `extend type Mutation` para evitar conflitos no GraphQL schema
+- ✅ Relacionamentos entre módulos usando apenas IDs (não importar entidades diretamente)
+- ✅ Validação de existência de entidades relacionadas no Service antes de criar relacionamento
 
 ---
 
