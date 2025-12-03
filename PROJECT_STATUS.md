@@ -1,6 +1,6 @@
 # 📊 Status do Projeto - GraphQL POC
 
-**Última atualização**: 2024-12-03 (tratamento de erros GraphQL implementado, resolvers simplificados)
+**Última atualização**: 2024-12-03 (DataLoader implementado para resolver N+1 problem)
 
 Este documento serve como fonte de verdade sobre o estado atual do projeto, decisões arquiteturais e próximos passos.
 
@@ -60,6 +60,7 @@ modules/{nome}/
 
 **Infrastructure:**
 - `user.repository.postgres.ts` - Implementação PostgreSQL
+  - findByIds: Batch loading para DataLoader (WHERE id = ANY($1::uuid[]))
 
 **GraphQL:**
 - `user.typeDefs.ts` - Schema GraphQL
@@ -88,6 +89,7 @@ modules/{nome}/
 **Infrastructure:**
 - `orb.repository.postgres.ts` - Implementação PostgreSQL completa
   - findById: Busca por ID com conversão JSONB → objeto
+  - findByIds: Batch loading para DataLoader (WHERE id = ANY($1::uuid[]))
   - create: Cria Orb com location como JSONB
   - updateStatus: Atualiza apenas status
 
@@ -148,6 +150,7 @@ modules/{nome}/
   - Mutation: `completeVerificationSession` (completa sessão)
   - Mutation: `updateVerificationSessionStatus` (atualiza status)
   - Conversão Date → String implementada
+  - Resolvers aninhados: `user` e `orb` usam DataLoaders para resolver N+1 problem
 
 **Database:**
 - ✅ Migration criada e executada: `create_verification_sessions_table`
@@ -170,6 +173,7 @@ modules/{nome}/
 - `pg` - Cliente PostgreSQL
 - `dotenv` - Variáveis de ambiente
 - `graphql` - Core GraphQL
+- `dataloader` - Batching e caching para resolver N+1 problem
 
 **Desenvolvimento:**
 - `typescript` - Compilador TypeScript
@@ -232,7 +236,11 @@ src/
 │   └── seeds/               # Seeds (vazio)
 ├── graphql/
 │   ├── schema.ts            # Combina TypeDefs e Resolvers
-│   ├── context.ts           # Context GraphQL (vazio)
+│   ├── context.ts           # Context GraphQL com Loaders
+│   ├── loaders/             # DataLoaders para batch loading
+│   │   ├── index.ts        # Factory de loaders e interface Loaders
+│   │   ├── user.loader.ts  # DataLoader para User
+│   │   └── orb.loader.ts   # DataLoader para Orb
 │   └── errors/
 │       ├── error.codes.ts   # Códigos de erro e mapeamento
 │       └── error.formatter.ts # Formatador de erros GraphQL
@@ -311,6 +319,21 @@ infrastructure/              # AWS CDK
 - **Códigos implementados**: USER_NOT_FOUND, ORB_NOT_FOUND, VERIFICATION_SESSION_NOT_FOUND, DUPLICATE_ENTRY, VERIFICATION_SESSION_ALREADY_COMPLETED, VALIDATION_ERROR, INTERNAL_SERVER_ERROR
 - **Resolvers simplificados**: Removidas conversões desnecessárias de erro, errorFormatter cuida da formatação
 
+### 10. DataLoader para Resolver N+1 Problem
+- **Decisão**: Implementar DataLoader para batch loading e caching de entidades relacionadas
+- **Razão**: Resolve problema N+1 em queries aninhadas, melhora performance significativamente
+- **Implementação**:
+  - Repositories: Adicionado método `findByIds(ids: string[])` em `IUserRepository` e `IOrbRepository` para batch loading
+  - Loaders: Criados `user.loader.ts` e `orb.loader.ts` usando biblioteca `dataloader`
+  - Context: `GraphQLContext` inclui `loaders: Loaders` criados por requisição
+  - Resolvers: `VerificationSession.user` e `VerificationSession.orb` usam `context.loaders.userLoader.load()` e `context.loaders.orbLoader.load()`
+- **Benefícios**:
+  - Batching: Múltiplas chamadas para mesma entidade são agrupadas em uma única query
+  - Caching: Dados são cacheados durante o ciclo de vida da requisição GraphQL
+  - Performance: Reduz drasticamente número de queries ao banco em queries aninhadas
+- **Arquitetura**: Loaders criados no `app.ts` context factory usando repositories do `schema.ts` (composition root)
+- **Padrão**: Cada requisição GraphQL recebe sua própria instância de loaders (cache isolado)
+
 ---
 
 ## 🔄 Fluxo de Dados
@@ -371,7 +394,7 @@ infrastructure/              # AWS CDK
 3. ✅ Revisar e melhorar type safety (remover `any` dos resolvers) - COMPLETO
 
 ### Médio Prazo (Features Avançadas)
-1. ⏳ DataLoader (resolver N+1 problem)
+1. ✅ DataLoader (resolver N+1 problem) - COMPLETO
 2. ⏳ Cursor-based pagination
 3. ⏳ Query depth/complexity limits
 4. ⏳ Authentication (JWT)
@@ -407,9 +430,8 @@ infrastructure/              # AWS CDK
 ## ⚠️ Problemas Conhecidos / Pendências
 
 1. **Testes**: Não implementados ainda (unit tests, integration tests)
-2. **N+1 Problem**: Não resolvido ainda (DataLoader necessário para queries aninhadas)
-3. **Pagination**: Não implementada (cursor-based pagination para listagens)
-4. **app.ts**: Erro de tipo com Mercurius (não crítico, não afeta funcionamento)
+2. **Pagination**: Não implementada (cursor-based pagination para listagens)
+3. **Type Safety**: Context nos resolvers usa `any` com type assertion (funcional, mas pode ser melhorado)
 
 ## 📝 Implementações Recentes
 
@@ -459,6 +481,17 @@ infrastructure/              # AWS CDK
 - ✅ Resolvers simplificados (removidas conversões desnecessárias de erro)
 - ✅ Sempre retorna HTTP 200 conforme especificação GraphQL
 - ✅ Erros formatados com extensions (code, statusCode, timestamp, stack)
+
+### DataLoader Implementation (2024-12-03)
+- ✅ Método `findByIds` implementado em `UserRepository` e `OrbRepository` para batch loading
+- ✅ DataLoaders criados (`user.loader.ts`, `orb.loader.ts`) usando biblioteca `dataloader`
+- ✅ Interface `Loaders` e factory `createLoaders` implementados (`loaders/index.ts`)
+- ✅ `GraphQLContext` atualizado para incluir `loaders: Loaders`
+- ✅ Context factory no `app.ts` cria loaders por requisição usando repositories do `schema.ts`
+- ✅ Resolvers `VerificationSession.user` e `VerificationSession.orb` atualizados para usar DataLoaders
+- ✅ N+1 problem resolvido: queries aninhadas agora fazem batch loading automático
+- ✅ Arquitetura mantida: composition root centralizado em `schema.ts`, loaders criados no context
+- ✅ Testado e funcionando: múltiplas sessões com mesmo user/orb fazem apenas 1 query cada
 
 ---
 

@@ -1,13 +1,12 @@
-import { OrbService } from '~/modules/orb/application/orb.service';
-import { UserService } from '~/modules/user/application/user.service';
+import { GraphQLContext } from '~/graphql/context';
+import { UserNotFoundError } from '~/modules/user/domain/user.errors';
 import { VerificationSessionService } from '~/modules/verification-session/application/verification-session.service';
 import { VerificationSessionNotFoundError } from '~/modules/verification-session/domain/verification-session.errors';
 import { VerificationSessionStatus } from '~/modules/verification-session/domain/verification-session.types';
+import { OrbNotFoundError } from '../../orb/domain/orb.errors';
 
 export function createVerificationSessionResolvers(
   verificationSessionService: VerificationSessionService,
-  userService: UserService,
-  orbService: OrbService,
 ) {
   return {
     Query: {
@@ -83,12 +82,15 @@ export function createVerificationSessionResolvers(
       },
     },
     VerificationSession: {
-      user: async (session: { userId: string }) => {
-        // ⚠️ Isso causa N+1 problem!
-        // Cada sessão chama isso individualmente
-        // TODO: Implementar DataLoader para resolver isso
+      user: async (session: { userId: string }, _args: unknown, context: unknown) => {
         try {
-          const user = await userService.findById(session.userId);
+          const ctx = context as GraphQLContext;
+          const user = await ctx.loaders.userLoader.load(session.userId);
+
+          if (!user) {
+            throw new UserNotFoundError(session.userId);
+          }
+
           return {
             ...user,
             createdAt: user.createdAt.toISOString(),
@@ -99,12 +101,15 @@ export function createVerificationSessionResolvers(
           throw error;
         }
       },
-      orb: async (session: { orbId: string }) => {
-        // ⚠️ Isso causa N+1 problem!
-        // Cada sessão chama isso individualmente
-        // TODO: Implementar DataLoader para resolver isso
+      orb: async (session: { orbId: string }, _args: unknown, context: unknown) => {
         try {
-          const orb = await orbService.findById(session.orbId);
+          const ctx = context as GraphQLContext;
+          const orb = await ctx.loaders.orbLoader.load(session.orbId);
+
+          if (!orb) {
+            throw new OrbNotFoundError(session.orbId);
+          }
+
           return {
             ...orb,
             createdAt: orb.createdAt.toISOString(),

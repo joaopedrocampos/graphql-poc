@@ -40,17 +40,14 @@ export const resolvers = {
   Query: {
     ...createUserResolvers(userService).Query,
     ...createOrbResolvers(orbService).Query,
-    ...createVerificationSessionResolvers(verificationSessionService, userService, orbService)
-      .Query,
+    ...createVerificationSessionResolvers(verificationSessionService).Query,
   },
   Mutation: {
     ...createUserResolvers(userService).Mutation,
     ...createOrbResolvers(orbService).Mutation,
-    ...createVerificationSessionResolvers(verificationSessionService, userService, orbService)
-      .Mutation,
+    ...createVerificationSessionResolvers(verificationSessionService).Mutation,
   },
   VerificationSession: {
-    ...createVerificationSessionResolvers(verificationSessionService, userService, orbService)
-      .VerificationSession,
+    ...createVerificationSessionResolvers(verificationSessionService).VerificationSession,
   },
 };
