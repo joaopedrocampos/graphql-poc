@@ -1,6 +1,6 @@
 # 📊 Status do Projeto - GraphQL POC
 
-**Última atualização**: 2024-12-03 (configuração TypeScript/ESLint completa, path aliases implementados)
+**Última atualização**: 2024-12-03 (tratamento de erros GraphQL implementado, resolvers simplificados)
 
 Este documento serve como fonte de verdade sobre o estado atual do projeto, decisões arquiteturais e próximos passos.
 
@@ -232,7 +232,10 @@ src/
 │   └── seeds/               # Seeds (vazio)
 ├── graphql/
 │   ├── schema.ts            # Combina TypeDefs e Resolvers
-│   └── context.ts           # Context GraphQL (vazio)
+│   ├── context.ts           # Context GraphQL (vazio)
+│   └── errors/
+│       ├── error.codes.ts   # Códigos de erro e mapeamento
+│       └── error.formatter.ts # Formatador de erros GraphQL
 ├── modules/
 │   ├── user/                # ✅ Completo
 │   ├── orb/                 # ✅ Completo
@@ -297,6 +300,17 @@ infrastructure/              # AWS CDK
 - **Razão**: Facilita validações de DTOs sem precisar usar bracket notation excessivamente
 - **ESLint**: Regras específicas para arquivos DTO que desabilitam unsafe operations (necessárias em validações)
 
+### 9. Tratamento de Erros GraphQL Padronizado
+- **Decisão**: Implementar errorFormatter centralizado no Mercurius
+- **Razão**: Formatação consistente de erros, melhor UX, fácil manutenção
+- **Implementação**:
+  - `error.codes.ts`: Define códigos de erro (enum) e mapeia erros de domínio para códigos
+  - `error.formatter.ts`: Formata erros para padrão GraphQL com extensions (code, statusCode, timestamp)
+  - `app.ts`: Configura `errorFormatter` no Mercurius
+- **Padrão**: Sempre retorna HTTP 200 (especificação GraphQL), erros no array `errors`
+- **Códigos implementados**: USER_NOT_FOUND, ORB_NOT_FOUND, VERIFICATION_SESSION_NOT_FOUND, DUPLICATE_ENTRY, VERIFICATION_SESSION_ALREADY_COMPLETED, VALIDATION_ERROR, INTERNAL_SERVER_ERROR
+- **Resolvers simplificados**: Removidas conversões desnecessárias de erro, errorFormatter cuida da formatação
+
 ---
 
 ## 🔄 Fluxo de Dados
@@ -352,9 +366,9 @@ infrastructure/              # AWS CDK
 ## 🚀 Próximos Passos
 
 ### Curto Prazo (Melhorias e Refinamentos)
-1. ⏳ Melhorar tratamento de erros GraphQL (formatação consistente)
+1. ✅ Melhorar tratamento de erros GraphQL (formatação consistente) - COMPLETO
 2. ⏳ Adicionar validações adicionais nos DTOs
-3. ⏳ Revisar e melhorar type safety (remover `any` dos resolvers)
+3. ✅ Revisar e melhorar type safety (remover `any` dos resolvers) - COMPLETO
 
 ### Médio Prazo (Features Avançadas)
 1. ⏳ DataLoader (resolver N+1 problem)
@@ -378,7 +392,9 @@ infrastructure/              # AWS CDK
 - Função factory: `create{Module}Resolvers(service)`
 - Retorna objeto com `Query` e `Mutation`
 - Converte `Date` para `String` nos retornos
-- Trata erros do domínio apropriadamente
+- Resolvers simplificados: erros de domínio são lançados diretamente, errorFormatter cuida da formatação
+- Queries: podem retornar `null` quando recurso não encontrado (comportamento GraphQL padrão)
+- Mutations: erros são formatados automaticamente pelo errorFormatter
 
 ### Estrutura de Services
 - Recebe Repository via constructor (DI)
@@ -391,10 +407,9 @@ infrastructure/              # AWS CDK
 ## ⚠️ Problemas Conhecidos / Pendências
 
 1. **Testes**: Não implementados ainda (unit tests, integration tests)
-2. **Error Handling**: Pode ser melhorado (formatação GraphQL mais consistente)
-3. **N+1 Problem**: Não resolvido ainda (DataLoader necessário para queries aninhadas)
-4. **Pagination**: Não implementada (cursor-based pagination para listagens)
-5. **app.ts**: Erro de tipo com Mercurius (não crítico, não afeta funcionamento)
+2. **N+1 Problem**: Não resolvido ainda (DataLoader necessário para queries aninhadas)
+3. **Pagination**: Não implementada (cursor-based pagination para listagens)
+4. **app.ts**: Erro de tipo com Mercurius (não crítico, não afeta funcionamento)
 
 ## 📝 Implementações Recentes
 
@@ -434,6 +449,16 @@ infrastructure/              # AWS CDK
 - ✅ Regras ESLint específicas para arquivos DTO (permite unsafe operations necessárias em validações)
 - ✅ `noPropertyAccessFromIndexSignature: false` para facilitar validações sem bracket notation excessiva
 - ✅ Validações de DTO simplificadas (sem type guards complexos, validação direta)
+
+### Tratamento de Erros GraphQL (2024-12-03)
+- ✅ Sistema de códigos de erro implementado (`error.codes.ts`)
+- ✅ Formatador de erros GraphQL centralizado (`error.formatter.ts`)
+- ✅ ErrorFormatter configurado no Mercurius (`app.ts`)
+- ✅ Mapeamento de todos os erros de domínio para códigos específicos
+- ✅ Detecção automática de erros de validação (baseado em mensagens)
+- ✅ Resolvers simplificados (removidas conversões desnecessárias de erro)
+- ✅ Sempre retorna HTTP 200 conforme especificação GraphQL
+- ✅ Erros formatados com extensions (code, statusCode, timestamp, stack)
 
 ---
 

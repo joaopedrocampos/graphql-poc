@@ -1,5 +1,5 @@
 import { UserService } from '~/modules/user/application/user.service';
-import { UserNotFoundError, UserEmailAlreadyExistsError } from '~/modules/user/domain/user.errors';
+import { UserNotFoundError } from '~/modules/user/domain/user.errors';
 
 export function createUserResolvers(userService: UserService) {
   return {
@@ -17,7 +17,6 @@ export function createUserResolvers(userService: UserService) {
           if (error instanceof UserNotFoundError) {
             return null;
           }
-
           throw error;
         }
       },
@@ -34,28 +33,19 @@ export function createUserResolvers(userService: UserService) {
           if (error instanceof UserNotFoundError) {
             return null;
           }
-
           throw error;
         }
       },
     },
     Mutation: {
       createUser: async (_parent: unknown, { name, email }: { name: string; email: string }) => {
-        try {
-          const createdUser = await userService.create({ name, email });
+        const createdUser = await userService.create({ name, email });
 
-          return {
-            ...createdUser,
-            createdAt: createdUser.createdAt.toISOString(),
-            updatedAt: createdUser.updatedAt.toISOString(),
-          };
-        } catch (error) {
-          if (error instanceof UserEmailAlreadyExistsError) {
-            throw new Error(error.message);
-          }
-
-          throw error;
-        }
+        return {
+          ...createdUser,
+          createdAt: createdUser.createdAt.toISOString(),
+          updatedAt: createdUser.updatedAt.toISOString(),
+        };
       },
     },
   };

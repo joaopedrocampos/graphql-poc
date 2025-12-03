@@ -1,10 +1,10 @@
-import { User } from '~/modules/user/domain/user.entity';
-import { UserEmailAlreadyExistsError, UserNotFoundError } from '~/modules/user/domain/user.errors';
-import { IUserRepository } from '~/modules/user/domain/user.repository.interface';
 import {
   CreateUserDto,
   validateCreateUserDto,
 } from '~/modules/user/application/dto/create-user.dto';
+import { User } from '~/modules/user/domain/user.entity';
+import { UserEmailAlreadyExistsError, UserNotFoundError } from '~/modules/user/domain/user.errors';
+import { IUserRepository } from '~/modules/user/domain/user.repository.interface';
 
 export class UserService {
   private readonly userRepository: IUserRepository;

@@ -1,6 +1,6 @@
 import { OrbService } from '~/modules/orb/application/orb.service';
 import { OrbNotFoundError } from '~/modules/orb/domain/orb.errors';
-import { OrbStatus, Location } from '~/modules/orb/domain/orb.types';
+import { Location, OrbStatus } from '~/modules/orb/domain/orb.types';
 
 export function createOrbResolvers(orbService: OrbService) {
   return {
@@ -18,7 +18,6 @@ export function createOrbResolvers(orbService: OrbService) {
           if (error instanceof OrbNotFoundError) {
             return null;
           }
-
           throw error;
         }
       },
@@ -36,45 +35,29 @@ export function createOrbResolvers(orbService: OrbService) {
           location: Location;
         },
       ) => {
-        try {
-          const createdOrb = await orbService.create({
-            serialNumber,
-            status,
-            location,
-          });
+        const createdOrb = await orbService.create({
+          serialNumber,
+          status,
+          location,
+        });
 
-          return {
-            ...createdOrb,
-            createdAt: createdOrb.createdAt.toISOString(),
-            updatedAt: createdOrb.updatedAt.toISOString(),
-          };
-        } catch (error) {
-          if (error instanceof OrbNotFoundError) {
-            throw new Error(error.message);
-          }
-
-          throw error;
-        }
+        return {
+          ...createdOrb,
+          createdAt: createdOrb.createdAt.toISOString(),
+          updatedAt: createdOrb.updatedAt.toISOString(),
+        };
       },
       updateOrbStatus: async (
         _parent: unknown,
         { id, status }: { id: string; status: OrbStatus },
       ) => {
-        try {
-          const updatedOrb = await orbService.updateStatus(id, status);
+        const updatedOrb = await orbService.updateStatus(id, status);
 
-          return {
-            ...updatedOrb,
-            createdAt: updatedOrb.createdAt.toISOString(),
-            updatedAt: updatedOrb.updatedAt.toISOString(),
-          };
-        } catch (error) {
-          if (error instanceof OrbNotFoundError) {
-            throw new Error(error.message);
-          }
-
-          throw error;
-        }
+        return {
+          ...updatedOrb,
+          createdAt: updatedOrb.createdAt.toISOString(),
+          updatedAt: updatedOrb.updatedAt.toISOString(),
+        };
       },
     },
   };
