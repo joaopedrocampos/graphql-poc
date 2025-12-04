@@ -1,6 +1,6 @@
 # 📊 Status do Projeto - GraphQL POC
 
-**Última atualização**: 2024-12-03 (DataLoader implementado para resolver N+1 problem)
+**Última atualização**: 2024-12-03 (AWS CDK Infrastructure implementada)
 
 Este documento serve como fonte de verdade sobre o estado atual do projeto, decisões arquiteturais e próximos passos.
 
@@ -251,13 +251,14 @@ src/
 └── shared/                  # Código compartilhado (vazio)
 
 infrastructure/              # AWS CDK
-├── bin/app.ts
+├── bin/app.ts              # Entry point - conecta todos os stacks
 ├── lib/
-│   ├── database-stack.ts
-│   ├── api-stack.ts
-│   ├── vpc-stack.ts
-│   └── security-stack.ts
-└── cdk.json
+│   ├── vpc-stack.ts        # VPC com subnets públicas e privadas
+│   ├── database-stack.ts   # RDS PostgreSQL com Secrets Manager
+│   └── api-stack.ts        # ECS Fargate + Application Load Balancer
+├── cdk.json                # Configuração do CDK
+├── tsconfig.json           # TypeScript config
+└── package.json            # Dependências CDK
 ```
 
 ---
@@ -334,6 +335,33 @@ infrastructure/              # AWS CDK
 - **Arquitetura**: Loaders criados no `app.ts` context factory usando repositories do `schema.ts` (composition root)
 - **Padrão**: Cada requisição GraphQL recebe sua própria instância de loaders (cache isolado)
 
+### 11. AWS CDK Infrastructure as Code
+- **Decisão**: Usar AWS CDK para gerenciar toda infraestrutura na AWS
+- **Razão**: Infrastructure as Code permite versionamento, reprodutibilidade e deploy automatizado
+- **Implementação**:
+  - **VPC Stack**: Cria VPC com subnets públicas (Load Balancer) e privadas (ECS + RDS), NAT Gateway para acesso à internet
+  - **Database Stack**: RDS PostgreSQL em subnet privada, Secrets Manager para credenciais, Security Group restritivo
+  - **API Stack**: ECS Fargate com containers Docker, Application Load Balancer público, Security Groups configurados
+- **Arquitetura**:
+  - Load Balancer (público) → ECS Fargate (privado) → RDS PostgreSQL (privado)
+  - Todos os recursos em VPC isolada com Security Groups configurados
+  - Dockerfile na raiz do projeto para build automático da imagem
+- **Deploy**: `cdk synth` valida código, `cdk deploy` cria recursos na AWS
+- **Benefícios**: Infraestrutura versionada, fácil de replicar, type-safe com TypeScript
+- **Decisão**: Implementar DataLoader para batch loading e caching de entidades relacionadas
+- **Razão**: Resolve problema N+1 em queries aninhadas, melhora performance significativamente
+- **Implementação**:
+  - Repositories: Adicionado método `findByIds(ids: string[])` em `IUserRepository` e `IOrbRepository` para batch loading
+  - Loaders: Criados `user.loader.ts` e `orb.loader.ts` usando biblioteca `dataloader`
+  - Context: `GraphQLContext` inclui `loaders: Loaders` criados por requisição
+  - Resolvers: `VerificationSession.user` e `VerificationSession.orb` usam `context.loaders.userLoader.load()` e `context.loaders.orbLoader.load()`
+- **Benefícios**:
+  - Batching: Múltiplas chamadas para mesma entidade são agrupadas em uma única query
+  - Caching: Dados são cacheados durante o ciclo de vida da requisição GraphQL
+  - Performance: Reduz drasticamente número de queries ao banco em queries aninhadas
+- **Arquitetura**: Loaders criados no `app.ts` context factory usando repositories do `schema.ts` (composition root)
+- **Padrão**: Cada requisição GraphQL recebe sua própria instância de loaders (cache isolado)
+
 ---
 
 ## 🔄 Fluxo de Dados
@@ -395,10 +423,10 @@ infrastructure/              # AWS CDK
 
 ### Médio Prazo (Features Avançadas)
 1. ✅ DataLoader (resolver N+1 problem) - COMPLETO
-2. ⏳ Cursor-based pagination
-3. ⏳ Query depth/complexity limits
-4. ⏳ Authentication (JWT)
-5. ⏳ AWS CDK (infraestrutura)
+2. ✅ AWS CDK (infraestrutura) - COMPLETO
+3. ⏳ Cursor-based pagination
+4. ⏳ Query depth/complexity limits
+5. ⏳ Authentication (JWT)
 
 ---
 
@@ -492,6 +520,17 @@ infrastructure/              # AWS CDK
 - ✅ N+1 problem resolvido: queries aninhadas agora fazem batch loading automático
 - ✅ Arquitetura mantida: composition root centralizado em `schema.ts`, loaders criados no context
 - ✅ Testado e funcionando: múltiplas sessões com mesmo user/orb fazem apenas 1 query cada
+
+### AWS CDK Infrastructure (2024-12-03)
+- ✅ VPC Stack criado: VPC com subnets públicas e privadas, NAT Gateway configurado
+- ✅ Database Stack criado: RDS PostgreSQL t3.micro, Secrets Manager para credenciais, Security Groups
+- ✅ API Stack criado: ECS Fargate com Docker, Application Load Balancer, Target Groups e Listeners
+- ✅ Dockerfile criado: Build automático da aplicação Node.js/TypeScript
+- ✅ `.dockerignore` configurado: Otimiza build da imagem Docker
+- ✅ `bin/app.ts` criado: Conecta todos os stacks com dependências corretas
+- ✅ `cdk synth` funcionando: Infraestrutura validada e pronta para deploy
+- ✅ Arquitetura completa: Load Balancer → ECS → RDS em VPC isolada
+- ✅ Security Groups configurados: Acesso restrito entre componentes
 
 ---
 
