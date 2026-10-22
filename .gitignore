@@ -8,3 +8,6 @@
 .env.production
 node_modules
 dist
+# AWS CDK output and local context (contain account IDs)
+infrastructure/cdk.out/
+infrastructure/cdk.context.json
